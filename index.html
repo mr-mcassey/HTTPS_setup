@@ -40,6 +40,7 @@
             border-radius: 0.375rem;
             cursor: pointer;
             transition: background-color 0.2s;
+            z-index: 10; /* Ensure button is above code */
         }
         .copy-btn:hover {
             background-color: rgba(255, 255, 255, 0.2);
@@ -57,7 +58,12 @@
         pre {
             background-color: #2d3748;
             color: #e2e8f0;
-            padding: 1.5rem 1rem 1rem 1rem;
+            /* Adjusted padding to prevent overlap with copy button */
+            padding: 2.5rem 1rem 1rem 1rem; /* Increased top padding */
+            border-radius: 0.5rem;
+            position: relative;
+            white-space: pre-wrap; /* Ensure long lines wrap */
+            word-break: break-all; /* Break long words */
         }
     </style>
 </head>
@@ -69,7 +75,7 @@
                 <div class="hidden sm:flex sm:space-x-8">
                     <a href="#part1" class="font-medium text-gray-600 hover:accent-text transition-colors">1. Certificates</a>
                     <a href="#part2" class="font-medium text-gray-600 hover:accent-text transition-colors">2. Nginx</a>
-                    <a href="#part3" class="font-medium text-gray-600 hover:accent-text transition-colors">3. Windows</a>
+                    <a href="#part3" class="font-medium text-gray-600 hover:accent-text transition-colors">3. Client Setup</a>
                 </div>
             </div>
         </nav>
@@ -78,14 +84,14 @@
     <main class="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
         <div class="bg-white rounded-lg shadow-lg p-6 sm:p-8 mb-8">
             <h2 class="text-2xl font-bold mb-4">Introduction</h2>
-            <p class="mb-4">This guide will walk you through securing a local application accessible via a <code>.lan</code> URL. We'll generate self-signed SSL certificates with XCA, configure Nginx to serve your application over HTTPS, and finally, make your Windows machine trust these certificates to avoid browser warnings.</p>
+            <p class="mb-4">This guide will walk you through securing a local application accessible via a custom local domain (e.g., <code>testapp.local</code>). We'll generate self-signed SSL certificates using **OpenSSL**, configure Nginx to serve your application over HTTPS, and finally, make your client machines (Windows, macOS, Linux) trust these certificates to avoid browser warnings.</p>
             
             <h3 class="text-lg font-semibold mb-4">Overall Process</h3>
             <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                 <div class="text-center">
                     <div class="bg-gray-200 rounded-lg p-4">
-                        <span class="text-2xl">📜</span>
-                        <p class="font-semibold mt-2">1. Create Certs (XCA)</p>
+                        <span class="text-2xl">🔐</span>
+                        <p class="font-semibold mt-2">1. Generate Certs (OpenSSL)</p>
                     </div>
                 </div>
                 <div class="text-gray-400 text-2xl font-bold">&rarr;</div>
@@ -99,74 +105,47 @@
                 <div class="text-center">
                     <div class="bg-gray-200 rounded-lg p-4">
                         <span class="text-2xl">💻</span>
-                        <p class="font-semibold mt-2">3. Trust Certs (Windows)</p>
+                        <p class="font-semibold mt-2">3. Client Trust Setup</p>
                     </div>
                 </div>
             </div>
         </div>
 
         <section id="part1" class="mb-12">
-            <h2 class="text-3xl font-bold mb-6 accent-text border-b-2 accent-border pb-2">Part 1: Creating Certificates with XCA</h2>
-            <p class="mb-6 text-gray-700">In this section, you'll use XCA on your Ubuntu machine to generate a custom Certificate Authority (CA) and then use it to sign a server certificate for your local website. This establishes a root of trust for your local environment.</p>
+            <h2 class="text-3xl font-bold mb-6 accent-text border-b-2 accent-border pb-2">Part 1: Generating Self-Signed Certificate with OpenSSL</h2>
+            <p class="mb-6 text-gray-700">In this section, you'll use OpenSSL on your server machine to generate a private key and a self-signed certificate. This certificate will be configured to be trusted by your browsers for your local domain.</p>
             <ol class="space-y-6">
-                <li class="step-item flex items-start cursor-pointer">
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
                     <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">1</div>
                     <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Install XCA</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this installs the software we'll use to create your security certificates)</p>
+                        <h3 class="font-bold text-lg">Create `v3.ext` Configuration File</h3>
+                        <p class="text-sm text-gray-600 mb-2">Create a `v3.ext` file on your server (e.g., in `/home/your_user/certs/`) with the following content. This file defines the Subject Alternative Name (SAN) and other crucial certificate properties.</p>
                         <div class="relative rounded-lg overflow-hidden mt-2">
-                            <pre><code class="language-bash">sudo apt update
-sudo apt install xca</code></pre>
+                            <pre><code class="language-ini">[v3_ext]
+subjectAltName = DNS:testapp.local
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth</code></pre>
+                            <button class="copy-btn">Copy</button>
+                        </div>
+                        <div class="relative rounded-lg overflow-hidden mt-4">
+                            <pre><code class="language-bash">nano /home/your_user/certs/v3.ext</code></pre>
                             <button class="copy-btn">Copy</button>
                         </div>
                     </div>
                 </li>
-                <li class="step-item flex items-start cursor-pointer">
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
                     <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">2</div>
                     <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Open XCA</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this starts the certificate management application)</p>
-                        <p>Launch XCA from your applications menu or by typing <code>xca</code> in the terminal.</p>
-                    </div>
-                </li>
-                <li class="step-item flex items-start cursor-pointer">
-                    <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">3</div>
-                    <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Create a New Database</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this creates a secure file to store your certificates and keys)</p>
-                        <p>Go to <strong>File -> New Database...</strong>. Choose a location and set a strong password.</p>
-                    </div>
-                </li>
-                <li class="step-item flex items-start cursor-pointer">
-                    <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">4</div>
-                    <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Create a Certificate Authority (CA)</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this creates the root certificate that will vouch for your server's certificate)</p>
-                        <p>In XCA, click "New Certificate". Use the "\[default] CA" template. Set the Common Name to something like <code>My Local Network CA</code>. On the Extensions tab, ensure "CA" is checked. Generate a new 2048-bit RSA key pair for it.</p>
-                    </div>
-                </li>
-                 <li class="step-item flex items-start cursor-pointer">
-                    <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">5</div>
-                    <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Create a Server Certificate</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this creates the certificate for your specific `.lan` website)</p>
-                        <p>Click "New Certificate" again. Use the "\[default] HTTPS_server" template and sign it with your new CA. The "Common Name" **must** be your URL (e.g., <code>myapp.lan</code>). Add your URL and IP address to the "Subject Alternative Name" (SAN) list. Generate another 2048-bit RSA key pair.</p>
-                    </div>
-                </li>
-                 <li class="step-item flex items-start cursor-pointer">
-                    <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">6</div>
-                    <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Export Server Certificate & Key</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this saves the necessary files for Nginx to use HTTPS)</p>
-                        <p>Select your server certificate and export it as <code>server_public.crt</code>. Then select its private key and export it as <code>server_private.key</code>.</p>
-                    </div>
-                </li>
-                <li class="step-item flex items-start cursor-pointer">
-                    <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">7</div>
-                    <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Export the CA Certificate</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this saves the file you'll import into Windows to trust your certificates)</p>
-                        <p>Select your CA certificate and export it as <code>ca_public.crt</code>.</p>
+                        <h3 class="font-bold text-lg">Generate Private Key and Self-Signed Certificate</h3>
+                        <p class="text-sm text-gray-600 mb-2">Run the following OpenSSL command in the same directory as your `v3.ext` file to generate your private key (`testapp.local.key`) and the self-signed certificate (`testapp.local.crt`). This certificate will include the necessary Common Name (CN) and Subject Alternative Name (SAN).</p>
+                        <div class="relative rounded-lg overflow-hidden mt-2">
+                            <pre><code class="language-bash">openssl req -x509 -new -key testapp.local.key -out testapp.local.crt -days 365 -subj "/CN=testapp.local" -extensions v3_ext -extfile v3.ext</code></pre>
+                            <button class="copy-btn">Copy</button>
+                        </div>
+                        <p class="text-sm text-yellow-600 mt-2 font-semibold">
+                            &bull; **Essential:** The `-extensions v3_ext -extfile v3.ext` part is crucial for including the SAN.
+                        </p>
                     </div>
                 </li>
             </ol>
@@ -176,7 +155,7 @@ sudo apt install xca</code></pre>
             <h2 class="text-3xl font-bold mb-6 accent-text border-b-2 accent-border pb-2">Part 2: Configuring Nginx for HTTPS</h2>
             <p class="mb-6 text-gray-700">Next, you will configure Nginx. This involves installing the web server, placing your newly created certificate files where Nginx can access them, and setting up a server block to handle encrypted traffic for your local site.</p>
             <ol class="space-y-6">
-                <li class="step-item flex items-start cursor-pointer">
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
                     <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">1</div>
                     <div class="flex-grow">
                         <h3 class="font-bold text-lg">Install Nginx</h3>
@@ -187,47 +166,94 @@ sudo apt install xca</code></pre>
                         </div>
                     </div>
                 </li>
-                 <li class="step-item flex items-start cursor-pointer">
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
                     <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">2</div>
                     <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Create SSL Directory & Move Files</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this puts the certificate files where Nginx can find them)</p>
-                         <div class="relative rounded-lg overflow-hidden mt-2">
+                        <h3 class="font-bold text-lg">Create SSL Directory & Move Certificate Files</h3>
+                        <p class="text-sm text-gray-600 mb-2">Create a directory for your SSL certificates and move the generated `testapp.local.crt` and `testapp.local.key` files into it. **Ensure these files are readable by Nginx.**</p>
+                        <div class="relative rounded-lg overflow-hidden mt-2">
                             <pre><code class="language-bash">sudo mkdir -p /etc/nginx/ssl
-sudo mv /path/to/server_public.crt /etc/nginx/ssl/
-sudo mv /path/to/server_private.key /etc/nginx/ssl/</code></pre>
+sudo mv /path/to/testapp.local.crt /etc/nginx/ssl/
+sudo mv /path/to/testapp.local.key /etc/nginx/ssl/</code></pre>
                             <button class="copy-btn">Copy</button>
                         </div>
-                        <p class="mt-2 text-sm">Replace <code>/path/to/</code> with the actual location of your exported files.</p>
+                        <p class="mt-2 text-sm text-blue-600">&bull; Replace <code>/path/to/</code> with the actual location of your generated files.</p>
                     </div>
                 </li>
-                <li class="step-item flex items-start cursor-pointer">
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
                     <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">3</div>
                     <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Create Nginx Server Block</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this configures how Nginx handles requests to your website)</p>
-                        <p>Create a new configuration file at <code>/etc/nginx/sites-available/myapp.lan</code> and paste in the server block configuration provided in the source document, replacing placeholders for your app's IP and port.</p>
+                        <h3 class="font-bold text-lg">Create Nginx Server Block Configuration</h3>
+                        <p class="text-sm text-gray-600 mb-2">Create a new Nginx configuration file (e.g., `/etc/nginx/sites-available/testapp.local`) and paste the following content. **Remember to adjust `root` directory and certificate paths.**</p>
+                        <div class="relative rounded-lg overflow-hidden mt-2">
+                            <pre><code class="language-nginx"># Nginx configuration for testapp.local on HTTP (Port 80)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name testapp.local;
+    root /var/www/testapp.local/html; # Adjust to your web files' location
+    index index.html index.htm;
+    access_log /var/log/nginx/testapp.local_access.log;
+    error_log /var/log/nginx/testapp.local_error.log;
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+
+# HTTPS server block (port 443)
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name testapp.local;
+    root /var/www/testapp.local/html; # Adjust to your web files' location
+    index index.html index.htm;
+    access_log /var/log/nginx/testapp.local_access.log;
+    error_log /var/log/nginx/testapp.local_error.log;
+
+    # **Essential:** Point to your certificate and key files
+    ssl_certificate /etc/nginx/ssl/testapp.local.crt; # Adjust path if different
+    ssl_certificate_key /etc/nginx/ssl/testapp.local.key; # Adjust path if different
+
+    # **Essential:** Specify strong SSL protocols and ciphers for compatibility
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:ECDHE+AESGCM:ECDHE+CHACHA20';
+    ssl_prefer_server_ciphers on;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}</code></pre>
+                            <button class="copy-btn">Copy</button>
+                        </div>
+                        <p class="text-sm text-yellow-600 mt-2 font-semibold">
+                            &bull; **Essential:** The `ssl_protocols` and `ssl_ciphers` lines are critical for broad browser compatibility.
+                        </p>
+                        <div class="relative rounded-lg overflow-hidden mt-2">
+                            <pre><code class="language-bash">sudo nano /etc/nginx/sites-available/testapp.local</code></pre>
+                            <button class="copy-btn">Copy</button>
+                        </div>
                     </div>
                 </li>
-                <li class="step-item flex items-start cursor-pointer">
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
                     <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">4</div>
                     <div class="flex-grow">
                         <h3 class="font-bold text-lg">Enable Server Block</h3>
                         <p class="text-sm text-gray-600 mb-2">(this tells Nginx to use your new website configuration)</p>
-                         <div class="relative rounded-lg overflow-hidden mt-2">
-                            <pre><code class="language-bash">sudo ln -s /etc/nginx/sites-available/myapp.lan /etc/nginx/sites-enabled/</code></pre>
+                        <div class="relative rounded-lg overflow-hidden mt-2">
+                            <pre><code class="language-bash">sudo ln -s /etc/nginx/sites-available/testapp.local /etc/nginx/sites-enabled/</code></pre>
                             <button class="copy-btn">Copy</button>
                         </div>
+                        <p class="mt-2 text-sm text-blue-600">&bull; Skip this step if you modified the `default` Nginx config file.</p>
                     </div>
                 </li>
-                 <li class="step-item flex items-start cursor-pointer">
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
                     <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">5</div>
                     <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Test and Restart Nginx</h3>
+                        <h3 class="font-bold text-lg">Test and Reload Nginx</h3>
                         <p class="text-sm text-gray-600 mb-2">(this applies your new Nginx configuration)</p>
-                         <div class="relative rounded-lg overflow-hidden mt-2">
+                        <div class="relative rounded-lg overflow-hidden mt-2">
                             <pre><code class="language-bash">sudo nginx -t
-sudo systemctl restart nginx</code></pre>
+sudo systemctl reload nginx</code></pre>
                             <button class="copy-btn">Copy</button>
                         </div>
                     </div>
@@ -235,24 +261,84 @@ sudo systemctl restart nginx</code></pre>
             </ol>
         </section>
 
-        <section id="part3">
-            <h2 class="text-3xl font-bold mb-6 accent-text border-b-2 accent-border pb-2">Part 3: Trusting the CA on Windows</h2>
-            <p class="mb-6 text-gray-700">The final step is to make your Windows machine trust your custom CA. This will eliminate the "Your connection is not private" errors in your browser when accessing your local site, as Windows will now recognize your CA as a valid authority.</p>
+        <section id="part3" class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 accent-text border-b-2 accent-border pb-2">Part 3: Client Machine Setup (Windows/macOS/Linux)</h2>
+            <p class="mb-6 text-gray-700">The final steps involve configuring your client machine to properly resolve and trust your local HTTPS site. This will eliminate browser security warnings.</p>
             <ol class="space-y-6">
-                 <li class="step-item flex items-start cursor-pointer">
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
                     <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">1</div>
                     <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Transfer the CA Certificate</h3>
-                        <p class="text-sm text-gray-600 mb-2">(move the `ca_public.crt` file to your Windows machine)</p>
-                        <p>Use a USB drive, network share, or any other method to copy the <code>ca_public.crt</code> file to your Windows desktop or downloads folder.</p>
+                        <h3 class="font-bold text-lg">Update `hosts` File</h3>
+                        <p class="text-sm text-gray-600 mb-2">On your client machine (Windows, macOS, or Linux), edit the `hosts` file to map `testapp.local` to your server's IP address. **This line MUST NOT be commented out.**</p>
+                        <div class="relative rounded-lg overflow-hidden mt-2">
+                            <pre><code class="language-bash"># For Windows: Open Notepad as Administrator, then open C:\Windows\System32\drivers\etc\hosts
+# For macOS/Linux: sudo nano /etc/hosts
+
+# Add this line (replace your_server_ip with your server's actual IP)
+your_server_ip   testapp.local</code></pre>
+                            <button class="copy-btn">Copy</button>
+                        </div>
+                        <p class="text-sm text-yellow-600 mt-2 font-semibold">
+                            &bull; **Essential:** This step is crucial for your browser to find `testapp.local`.
+                        </p>
                     </div>
                 </li>
-                 <li class="step-item flex items-start cursor-pointer">
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
                     <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">2</div>
                     <div class="flex-grow">
-                        <h3 class="font-bold text-lg">Import the CA Certificate into Windows</h3>
-                        <p class="text-sm text-gray-600 mb-2">(this installs the CA certificate so Windows recognizes your website's security)</p>
-                        <p>Open the Microsoft Management Console (<code>mmc.exe</code>), add the "Certificates" snap-in for the "Computer account". Navigate to <strong>Trusted Root Certification Authorities > Certificates</strong>, right-click, and import your <code>ca_public.crt</code> file.</p>
+                        <h3 class="font-bold text-lg">Trust the Certificate</h3>
+                        <p class="text-sm text-gray-600 mb-2">Transfer the `testapp.local.crt` file from your server to your client machine. Then, import it into your operating system's trusted certificate store. **It is crucial to delete any old `testapp.local` certificates first, then import the new one.**</p>
+                        <div class="relative rounded-lg overflow-hidden mt-2">
+                            <pre><code class="language-bash"># For Windows:
+# 1. Open certmgr.msc
+# 2. Navigate to Trusted Root Certification Authorities -> Certificates
+# 3. Find and Delete any existing 'testapp.local' certificates.
+# 4. Right-click in the Certificates pane -> All Tasks -> Import...
+# 5. Browse to your testapp.local.crt file, select it.
+# 6. Place it in the "Trusted Root Certification Authorities" store.
+# 7. Complete the wizard (click Yes/OK for prompts).
+
+# For macOS:
+# 1. Open Keychain Access (Applications/Utilities/Keychain Access.app)
+# 2. Select 'System' keychain in the sidebar.
+# 3. Drag and drop testapp.local.crt into the 'Certificates' category, or File > Import Items...
+# 4. Double-click the imported 'testapp.local' certificate.
+# 5. Expand the 'Trust' section.
+# 6. Change "When using this certificate:" to "Always Trust".
+# 7. Close the window and authenticate if prompted.</code></pre>
+                            <button class="copy-btn">Copy</button>
+                        </div>
+                        <p class="text-sm text-yellow-600 mt-2 font-semibold">
+                            &bull; **Essential:** This step tells your OS and browsers to trust your self-signed certificate.
+                        </p>
+                    </div>
+                </li>
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">3</div>
+                    <div class="flex-grow">
+                        <h3 class="font-bold text-lg">Clear Browser Cache and Restart Browsers</h3>
+                        <p class="text-sm text-gray-600 mb-2">Clear all browsing data (especially cookies and cached files) and delete domain security policies for `testapp.local` in your browser's internal settings. Then, fully restart all browsers (Chrome, Brave, Edge, Safari, Firefox).</p>
+                        <div class="relative rounded-lg overflow-hidden mt-2">
+                            <pre><code class="language-bash"># For Chrome/Brave/Edge:
+# 1. Open browser settings -> Privacy and security -> Clear browsing data.
+# 2. Set Time range to "All time".
+# 3. Check "Cookies and other site data" and "Cached images and files".
+# 4. Click "Clear data".
+# 5. Go to chrome://net-internals/#hsts (or brave://net-internals/#hsts or edge://net-internals/#hsts)
+# 6. In "Delete domain security policies", enter "testapp.local" and click "Delete".
+# 7. Close all browser windows and reopen them.</code></pre>
+                            <button class="copy-btn">Copy</button>
+                        </div>
+                        <p class="text-sm text-yellow-600 mt-2 font-semibold">
+                            &bull; **Essential:** This helps eliminate any lingering cached certificate or HSTS issues.
+                        </p>
+                    </div>
+                </li>
+                <li class="step-item flex items-start cursor-pointer p-4 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div class="step-number flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold mr-4">4</div>
+                    <div class="flex-grow">
+                        <h3 class="font-bold text-lg">Verify HTTPS Connection</h3>
+                        <p class="text-sm text-gray-600 mb-2">Open `https://testapp.local` in your browser. The "Not secure" warning should now be gone!</p>
                     </div>
                 </li>
             </ol>
@@ -264,7 +350,8 @@ sudo systemctl restart nginx</code></pre>
             copyButtons.forEach(button => {
                 button.addEventListener('click', (e) => {
                     const pre = e.target.previousElementSibling;
-                    const code = pre.querySelector('code').innerText;
+                    // For preformatted text, innerText is usually sufficient
+                    const code = pre.innerText;
                     
                     const el = document.createElement('textarea');
                     el.value = code;
@@ -285,8 +372,11 @@ sudo systemctl restart nginx</code></pre>
 
             const stepItems = document.querySelectorAll('.step-item');
             stepItems.forEach(item => {
-                item.addEventListener('click', () => {
-                    item.classList.toggle('completed');
+                item.addEventListener('click', (event) => {
+                    // Only toggle if the click wasn't on a button or link inside
+                    if (!event.target.closest('button') && !event.target.closest('a') && event.target.tagName !== 'INPUT') {
+                        item.classList.toggle('completed');
+                    }
                 });
             });
 
